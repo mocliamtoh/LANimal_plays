@@ -2,74 +2,97 @@
 local socket = require("socket.core") 
 
 -- Mapping for commands and button presses
-buttons = {"A","B","start","select","up","left","down","right"}
-buttonCmd = {"a","b","start","select","up","left","down","right"}
+local buttons = {"A","B","X","Y","L","R","start","select","up","left","down","right"}
 
-local state = {true,false}
 local keyInput = {}
+local buttonIn = {}
 
-function findInput(message,commands, prepend)
+--Searches through the message for input button commands
+--Returns a list of indices corresponding to which buttons have been pressed
+function findInput(message)
     if not prepend then
         prepend = ""
     end
     
-    for key,value in pairs(commands) do
-        front,back = string.find(message, prepend .. value)
-        if back == string.len(message) then
-            return key
+    buttonList = {}
+    numButtons = 0
+
+    for key,value in pairs(buttons) do
+        if string.find(message, value .. 'h') then
+            numButtons = numButtons + 1
+            buttonList[buttons[key]] = 5
+        elseif string.find(message, value) then
+            numButtons = numButtons + 1
+            buttonList[buttons[key]] = 1
         end
     end
-    
-    return nil
+
+    if numButtons == 0 then
+        return nil
+    else
+        return buttonList
+    end
+
 end
 
-function setPlayerInput(button, keyInput)
-    for key,value in pairs(buttons) do
-        if key == button then
-            keyInput[value] = true
+--Accepts a list of indices corresponding to the buttons that have been pressed
+--Returns a table with button input for the emulator
+function setPlayerInput(buttonList)
+    for key,value in pairs(buttonList) do
+        if value > 0 then
+            buttonList[key] = buttonList[key] - 1
+            hasKey = true
         else
-            keyInput[value] = false
+            hasKey = false
         end
+
+        keyInput[key] = hasKey
     end
-    return keyInput
+
+    return buttonList
 end
+
+------------------MAIN-----------------------------
+
+--[[
+testin = 'A'
+print(testin)
+print(findInput(testin))
+--]]
 
 s = socket.tcp()
 
 for key,value in pairs(buttons) do
-    keyInput[value] = state[2]
+    keyInput[value] = false
+    buttonIn[value] = 0
 end
 
--- Connect to the IRC server/channel
+-- Wait for incoming connection from python script
 s:bind('localhost', 6667)
-s:accept()
+s:listen()
+pyInput = s:accept()
 
 -- Set the receive command to not block, so that the emulator can advance normally
-s:settimeout(0)
+pyInput:settimeout(0)
 
 while true do
-    receive = s:receive('*l')
+    receive = pyInput:receive('*l')
 
     if receive then
-        -- Reply to ping requests to stay connected to the server
-        if string.find(receive, ping) then
-            s:send("PONG :" .. string.sub(receive, (string.find(receive, ping) + 6)) .. "\r\n\r\n")
-            print("Received PING.  Replied PONG")
-        else
-            -- Set buttons based on the command received
-            local button = findInput(receive, buttonCmd, msg)
-            
-            -- End the program, used for debugging
-            if string.find(receive, msg .. "exit") then
-                break
-            end
-
-            keyInput = setPlayerInput(button, keyInput)
-            joypad.set(1, keyInput)
-            emu.frameadvance()
+        -- Set buttons based on the command received
+        buttonIn = findInput(receive)
+        
+        -- End the program, used for debugging
+        if string.find(receive, "exit") then
+            break
         end
+
+        buttonIn = setPlayerInput(buttonIn)
+        print(keyInput)
+        joypad.set(1, keyInput)
+        emu.frameadvance()
     else
-        keyInput = setPlayerInput(button, keyInput)
+        buttonIn = setPlayerInput(buttonIn)
         joypad.set(1, keyInput)
         emu.frameadvance()
     end
@@ -77,3 +100,4 @@ while true do
 end
 
 s:close()
+
