@@ -1,5 +1,5 @@
 class botCredentials:
-    address = 'irc.freenode.net'
+    address = 'irc.sus.mcgill.ca'
     port = 6667
     channel = '#testPythonBot'
     nickname = 'LANimalBot'

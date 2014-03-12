@@ -20,10 +20,10 @@ function findInput(message)
     for key,value in pairs(buttons) do
         if string.find(message, value .. 'h') then
             numButtons = numButtons + 1
-            buttonList[buttons[key]] = 5
+            buttonList[buttons[key]] = 50
         elseif string.find(message, value) then
             numButtons = numButtons + 1
-            buttonList[buttons[key]] = 1
+            buttonList[buttons[key]] = 5
         end
     end
 
